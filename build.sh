@@ -7,7 +7,7 @@ mkdir -p lib
 mkdir -p build
 
 # Download Kafka dependencies if not present
-KAFKA_VERSION="3.6.0"
+KAFKA_VERSION="4.0.0"
 SLF4J_VERSION="2.0.9"
 
 download_jar() {

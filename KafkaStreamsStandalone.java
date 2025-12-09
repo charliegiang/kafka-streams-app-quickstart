@@ -22,8 +22,11 @@ public class KafkaStreamsStandalone {
     private static String BOOTSTRAP_SERVERS = "";
     private static String USERNAME = "";
     private static String PASSWORD = "";
-    private static String INPUT_TOPIC = "kstreams-topic3";
-    private static String OUTPUT_TOPIC = "kstreams-topic4";
+    private static String INPUT_TOPIC = "kstreams-topic1";
+    private static String OUTPUT_TOPIC = "kstreams-topic2";
+    private static String APPLICATION_ID = "kafka-streams-app";
+    private static String CLIENT_ID = "streams-client-1";
+    private static boolean USE_STREAMS_PROTOCOL = false;
     private static final CountDownLatch latch = new CountDownLatch(1);
     private static final AtomicBoolean running = new AtomicBoolean(false);
     private static KafkaStreams streams;
@@ -32,6 +35,16 @@ public class KafkaStreamsStandalone {
     private static JTextArea logArea;
     private static JButton startButton;
     private static JButton stopButton;
+    
+    // Second instance variables
+    private static final AtomicBoolean running2 = new AtomicBoolean(false);
+    private static KafkaStreams streams2;
+    private static Thread producerThread2;
+    private static Thread consumerThread2;
+    private static JButton startButton2;
+    private static JButton stopButton2;
+    private static String APPLICATION_ID_2 = "kafka-streams-app-2";
+    private static String CLIENT_ID_2 = "streams-client-2";
 
     public static void main(String[] args) {
         // Check if running with CLI arguments
@@ -72,14 +85,14 @@ public class KafkaStreamsStandalone {
 
         // Username
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
-        configPanel.add(new JLabel("Username (optional):"), gbc);
+        configPanel.add(new JLabel("Username:"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2;
         JTextField usernameField = new JTextField(30);
         configPanel.add(usernameField, gbc);
 
         // Password
         gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1;
-        configPanel.add(new JLabel("Password (optional):"), gbc);
+        configPanel.add(new JLabel("Password:"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2;
         JPasswordField passwordField = new JPasswordField(30);
         configPanel.add(passwordField, gbc);
@@ -88,15 +101,37 @@ public class KafkaStreamsStandalone {
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 1;
         configPanel.add(new JLabel("Input Topic:"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2;
-        JTextField inputTopicField = new JTextField("kstreams-topic3", 30);
+        JTextField inputTopicField = new JTextField("kstreams-topic1", 30);
         configPanel.add(inputTopicField, gbc);
 
         // Output Topic
         gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 1;
         configPanel.add(new JLabel("Output Topic:"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2;
-        JTextField outputTopicField = new JTextField("kstreams-topic4", 30);
+        JTextField outputTopicField = new JTextField("kstreams-topic2", 30);
         configPanel.add(outputTopicField, gbc);
+
+        // Application ID
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 1;
+        configPanel.add(new JLabel("Application ID:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        JTextField appIdField = new JTextField("kafka-streams-app", 30);
+        configPanel.add(appIdField, gbc);
+
+        // Client ID
+        gbc.gridx = 0; gbc.gridy = 6; gbc.gridwidth = 1;
+        configPanel.add(new JLabel("Client ID:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        JTextField clientIdField = new JTextField("streams-client-1", 30);
+        configPanel.add(clientIdField, gbc);
+
+        // Group Protocol
+        gbc.gridx = 0; gbc.gridy = 7; gbc.gridwidth = 1;
+        configPanel.add(new JLabel("Use Streams Protocol:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        JCheckBox streamsProtocolCheckbox = new JCheckBox("Set group.protocol to 'streams'");
+        streamsProtocolCheckbox.setSelected(false);
+        configPanel.add(streamsProtocolCheckbox, gbc);
 
         // Control buttons
         JPanel buttonPanel = new JPanel();
@@ -113,6 +148,9 @@ public class KafkaStreamsStandalone {
             PASSWORD = new String(passwordField.getPassword());
             INPUT_TOPIC = inputTopicField.getText();
             OUTPUT_TOPIC = outputTopicField.getText();
+            APPLICATION_ID = appIdField.getText();
+            CLIENT_ID = clientIdField.getText();
+            USE_STREAMS_PROTOCOL = streamsProtocolCheckbox.isSelected();
             
             if (BOOTSTRAP_SERVERS.isEmpty()) {
                 JOptionPane.showMessageDialog(frame, "Bootstrap Servers is required!");
@@ -129,6 +167,9 @@ public class KafkaStreamsStandalone {
             passwordField.setEnabled(false);
             inputTopicField.setEnabled(false);
             outputTopicField.setEnabled(false);
+            appIdField.setEnabled(false);
+            clientIdField.setEnabled(false);
+            streamsProtocolCheckbox.setEnabled(false);
         });
 
         stopButton.addActionListener(e -> {
@@ -142,6 +183,9 @@ public class KafkaStreamsStandalone {
             passwordField.setEnabled(true);
             inputTopicField.setEnabled(true);
             outputTopicField.setEnabled(true);
+            appIdField.setEnabled(true);
+            clientIdField.setEnabled(true);
+            streamsProtocolCheckbox.setEnabled(true);
         });
 
         saveConfigButton.addActionListener(e -> {
@@ -155,6 +199,9 @@ public class KafkaStreamsStandalone {
                     props.setProperty("password", new String(passwordField.getPassword()));
                     props.setProperty("input.topic", inputTopicField.getText());
                     props.setProperty("output.topic", outputTopicField.getText());
+                    props.setProperty("application.id", appIdField.getText());
+                    props.setProperty("client.id", clientIdField.getText());
+                    props.setProperty("use.streams.protocol", String.valueOf(streamsProtocolCheckbox.isSelected()));
                     
                     try (FileOutputStream out = new FileOutputStream(fileChooser.getSelectedFile())) {
                         props.store(out, "Kafka Streams Configuration");
@@ -177,8 +224,11 @@ public class KafkaStreamsStandalone {
                     bootstrapField.setText(props.getProperty("bootstrap.servers", ""));
                     usernameField.setText(props.getProperty("username", ""));
                     passwordField.setText(props.getProperty("password", ""));
-                    inputTopicField.setText(props.getProperty("input.topic", "kstreams-topic3"));
-                    outputTopicField.setText(props.getProperty("output.topic", "kstreams-topic4"));
+                    inputTopicField.setText(props.getProperty("input.topic", "kstreams-topic1"));
+                    outputTopicField.setText(props.getProperty("output.topic", "kstreams-topic2"));
+                    appIdField.setText(props.getProperty("application.id", "kafka-streams-app"));
+                    clientIdField.setText(props.getProperty("client.id", "streams-client-1"));
+                    streamsProtocolCheckbox.setSelected(Boolean.parseBoolean(props.getProperty("use.streams.protocol", "false")));
                     log("Configuration loaded from " + fileChooser.getSelectedFile());
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(frame, "Error loading configuration: " + ex.getMessage());
@@ -191,8 +241,37 @@ public class KafkaStreamsStandalone {
         buttonPanel.add(saveConfigButton);
         buttonPanel.add(loadConfigButton);
 
-        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 3;
+        gbc.gridx = 0; gbc.gridy = 8; gbc.gridwidth = 3;
         configPanel.add(buttonPanel, gbc);
+
+        // Second instance panel
+        JPanel instance2Panel = new JPanel();
+        instance2Panel.setBorder(BorderFactory.createTitledBorder("Second Instance"));
+        startButton2 = new JButton("Start Instance 2");
+        stopButton2 = new JButton("Stop Instance 2");
+        stopButton2.setEnabled(false);
+
+        startButton2.addActionListener(e -> {
+            if (BOOTSTRAP_SERVERS.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "Please configure and start the first instance!");
+                return;
+            }
+            startApplication2();
+            startButton2.setEnabled(false);
+            stopButton2.setEnabled(true);
+        });
+
+        stopButton2.addActionListener(e -> {
+            stopApplication2();
+            startButton2.setEnabled(true);
+            stopButton2.setEnabled(false);
+        });
+
+        instance2Panel.add(startButton2);
+        instance2Panel.add(stopButton2);
+
+        gbc.gridx = 0; gbc.gridy = 9; gbc.gridwidth = 3;
+        configPanel.add(instance2Panel, gbc);
 
         // Log area
         logArea = new JTextArea();
@@ -228,6 +307,12 @@ public class KafkaStreamsStandalone {
                 INPUT_TOPIC = arg.substring(14);
             } else if (arg.startsWith("--output-topic=")) {
                 OUTPUT_TOPIC = arg.substring(15);
+            } else if (arg.startsWith("--application-id=")) {
+                APPLICATION_ID = arg.substring(17);
+            } else if (arg.startsWith("--client-id=")) {
+                CLIENT_ID = arg.substring(12);
+            } else if (arg.equals("--use-streams-protocol")) {
+                USE_STREAMS_PROTOCOL = true;
             } else if (arg.equals("--help")) {
                 printHelp();
                 System.exit(0);
@@ -268,8 +353,11 @@ public class KafkaStreamsStandalone {
         System.out.println("  --bootstrap-servers=<servers>  Kafka bootstrap servers (required)");
         System.out.println("  --username=<username>          SASL username (optional)");
         System.out.println("  --password=<password>          SASL password (optional)");
-        System.out.println("  --input-topic=<topic>          Input topic (default: kstreams-topic3)");
-        System.out.println("  --output-topic=<topic>         Output topic (default: kstreams-topic4)");
+        System.out.println("  --input-topic=<topic>          Input topic (default: kstreams-topic1)");
+        System.out.println("  --output-topic=<topic>         Output topic (default: kstreams-topic2)");
+        System.out.println("  --application-id=<id>          Application ID (default: kafka-streams-app)");
+        System.out.println("  --client-id=<id>               Client ID (default: streams-client-1)");
+        System.out.println("  --use-streams-protocol         Set group.protocol to 'streams'");
         System.out.println("  --help                         Show this help message");
     }
 
@@ -359,8 +447,7 @@ public class KafkaStreamsStandalone {
 
     private static Properties createStreamProperties() {
         Properties props = new Properties();
-        String appId = "kafka-streams-app-" + UUID.randomUUID().toString().substring(0, 8);
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, appId);
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_ID);
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         
         if (!USERNAME.isEmpty() && !PASSWORD.isEmpty()) {
@@ -373,8 +460,12 @@ public class KafkaStreamsStandalone {
 
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-        props.put(StreamsConfig.CLIENT_ID_CONFIG, "streams-client-1");
+        props.put(StreamsConfig.CLIENT_ID_CONFIG, CLIENT_ID);
         props.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.AT_LEAST_ONCE);
+        
+        if (USE_STREAMS_PROTOCOL) {
+            props.put("group.protocol", "streams");
+        }
         
         // Timeout configurations
         props.put(StreamsConfig.REQUEST_TIMEOUT_MS_CONFIG, "60000");
@@ -421,6 +512,168 @@ public class KafkaStreamsStandalone {
         } catch (Exception e) {
             if (running.get()) {
                 log("Producer error: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void startApplication2() {
+        running2.set(true);
+        
+        new Thread(() -> {
+            try {
+                Properties streamProps = createStreamProperties2();
+                
+                StreamsBuilder builder = new StreamsBuilder();
+                KStream<String, String> source = builder.stream(INPUT_TOPIC);
+                source.mapValues(value -> "[Instance2] " + value.toUpperCase()).to(OUTPUT_TOPIC);
+
+                streams2 = new KafkaStreams(builder.build(), streamProps);
+
+                streams2.setUncaughtExceptionHandler(e -> {
+                    log("ERROR (Instance 2): " + e.getMessage());
+                    return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.REPLACE_THREAD;
+                });
+
+                streams2.setStateListener((newState, oldState) -> {
+                    log("Instance 2 State changed: " + oldState + " -> " + newState);
+                });
+
+                // Start producer and consumer for instance 2
+                producerThread2 = new Thread(() -> produceMessages2());
+                consumerThread2 = new Thread(() -> consumeMessages2());
+                
+                producerThread2.start();
+                consumerThread2.start();
+                
+                streams2.start();
+                log("Kafka Streams Instance 2 started successfully!");
+                
+            } catch (Exception e) {
+                log("ERROR starting Instance 2: " + e.getMessage());
+                e.printStackTrace();
+                stopApplication2();
+            }
+        }).start();
+    }
+
+    private static void stopApplication2() {
+        running2.set(false);
+        
+        if (producerThread2 != null) {
+            producerThread2.interrupt();
+        }
+        if (consumerThread2 != null) {
+            consumerThread2.interrupt();
+        }
+        if (streams2 != null) {
+            streams2.close(Duration.ofSeconds(10));
+        }
+        
+        log("Instance 2 stopped");
+    }
+
+    private static Properties createStreamProperties2() {
+        Properties props = new Properties();
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_ID_2);
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        
+        if (!USERNAME.isEmpty() && !PASSWORD.isEmpty()) {
+            props.put("security.protocol", "SASL_SSL");
+            props.put("sasl.mechanism", "PLAIN");
+            props.put("sasl.jaas.config",
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+                    "username=\"" + USERNAME + "\" password=\"" + PASSWORD + "\";");
+        }
+
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        props.put(StreamsConfig.CLIENT_ID_CONFIG, CLIENT_ID_2);
+        props.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.AT_LEAST_ONCE);
+        
+        if (USE_STREAMS_PROTOCOL) {
+            props.put("group.protocol", "streams");
+        }
+        
+        // Timeout configurations
+        props.put(StreamsConfig.REQUEST_TIMEOUT_MS_CONFIG, "60000");
+        props.put(StreamsConfig.RETRY_BACKOFF_MS_CONFIG, "2000");
+        
+        return props;
+    }
+
+    private static void produceMessages2() {
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        
+        if (!USERNAME.isEmpty() && !PASSWORD.isEmpty()) {
+            props.put("security.protocol", "SASL_SSL");
+            props.put("sasl.mechanism", "PLAIN");
+            props.put("sasl.jaas.config",
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+                    "username=\"" + USERNAME + "\" password=\"" + PASSWORD + "\";");
+        }
+        
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, 
+                  "org.apache.kafka.common.serialization.StringSerializer");
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, 
+                  "org.apache.kafka.common.serialization.StringSerializer");
+
+        try (Producer<String, String> producer = new KafkaProducer<>(props)) {
+            int count = 0;
+            while (running2.get()) {
+                String key = "key-i2-" + count;
+                String value = "value-i2-" + count;
+                ProducerRecord<String, String> record = new ProducerRecord<>(INPUT_TOPIC, key, value);
+                
+                producer.send(record, (metadata, ex) -> {
+                    if (ex == null) {
+                        log("Instance 2 Produced: " + key + " to partition " + metadata.partition());
+                    } else {
+                        log("Instance 2 Producer error: " + ex.getMessage());
+                    }
+                });
+                
+                count++;
+                Thread.sleep(2000);
+            }
+        } catch (Exception e) {
+            if (running2.get()) {
+                log("Instance 2 Producer error: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void consumeMessages2() {
+        Properties props = new Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "consumer-2-" + UUID.randomUUID().toString().substring(0, 8));
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        
+        if (!USERNAME.isEmpty() && !PASSWORD.isEmpty()) {
+            props.put("security.protocol", "SASL_SSL");
+            props.put("sasl.mechanism", "PLAIN");
+            props.put("sasl.jaas.config",
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+                    "username=\"" + USERNAME + "\" password=\"" + PASSWORD + "\";");
+        }
+        
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, 
+                  "org.apache.kafka.common.serialization.StringDeserializer");
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, 
+                  "org.apache.kafka.common.serialization.StringDeserializer");
+
+        try (Consumer<String, String> consumer = new KafkaConsumer<>(props)) {
+            consumer.subscribe(Collections.singletonList(OUTPUT_TOPIC));
+            
+            while (running2.get()) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+                for (ConsumerRecord<String, String> record : records) {
+                    log("Instance 2 Consumed: " + record.key() + " = " + record.value());
+                }
+            }
+        } catch (Exception e) {
+            if (running2.get()) {
+                log("Instance 2 Consumer error: " + e.getMessage());
             }
         }
     }
