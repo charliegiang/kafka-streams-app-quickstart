@@ -1,0 +1,34 @@
+# Build artifacts
+build/
+uber/
+temp_extract/
+
+# Dependencies
+lib/
+
+# Generated JAR files
+*.jar
+
+# Extracted package directories
+kafka/
+common/
+org/
+com/
+ch/
+rocksd/
+META-INF/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

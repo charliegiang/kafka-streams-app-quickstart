@@ -20,33 +20,39 @@ powershell -Command "& { if (!(Test-Path 'lib\slf4j-simple-%SLF4J_VERSION%.jar')
 
 REM Compile
 echo Compiling...
-javac -cp "lib\*" -d build src\main\java\KafkaStreamsStandalone.java
+javac -cp "lib\*" -d build KafkaStreamsStandalone.java
 
 if %ERRORLEVEL% NEQ 0 (
     echo Compilation failed!
     exit /b 1
 )
 
-REM Create manifest
-echo Manifest-Version: 1.0 > build\MANIFEST.MF
-echo Main-Class: KafkaStreamsStandalone >> build\MANIFEST.MF
-echo Class-Path: . >> build\MANIFEST.MF
+REM Create uber JAR directory
+echo Creating uber JAR...
+mkdir uber 2>nul
 
-REM Create JAR
-echo Creating executable JAR...
-cd build
-jar cfm ..\kafka-streams-app.jar MANIFEST.MF *.class
+REM Extract all dependencies
+for %%j in (lib\*.jar) do (
+    echo Extracting %%~nxj...
+    cd uber
+    jar xf "..\%%j" 2>nul
+    cd ..
+)
+
+REM Copy compiled classes
+xcopy /E /Y build\*.class uber\ >nul
+
+REM Create manifest
+echo Manifest-Version: 1.0 > uber\MANIFEST.MF
+echo Main-Class: KafkaStreamsStandalone >> uber\MANIFEST.MF
+
+REM Create final JAR
+cd uber
+jar cfm ..\kafka-streams-app.jar MANIFEST.MF . 2>nul
 cd ..
 
-REM Add dependencies to JAR
-for %%j in (lib\*.jar) do (
-    echo Adding %%~nxj to executable...
-    jar xf "%%j" 2>nul
-    jar uf kafka-streams-app.jar META-INF org com 2>nul
-    rmdir /s /q META-INF 2>nul
-    rmdir /s /q org 2>nul
-    rmdir /s /q com 2>nul
-)
+REM Cleanup
+rmdir /s /q uber 2>nul
 
 echo.
 echo Build complete!

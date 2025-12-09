@@ -35,7 +35,7 @@ download_jar "org.rocksdb" "rocksdbjni" "7.9.2"
 
 # Compile the Java file
 echo "Compiling..."
-javac -cp "lib/*" -d build src/main/java/KafkaStreamsStandalone.java
+javac -cp "lib/*" -d build KafkaStreamsStandalone.java
 
 if [ $? -ne 0 ]; then
     echo "Compilation failed!"
