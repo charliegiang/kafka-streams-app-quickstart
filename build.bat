@@ -6,7 +6,7 @@ if not exist lib mkdir lib
 if not exist build mkdir build
 
 REM Set versions
-set KAFKA_VERSION=4.0.0
+set KAFKA_VERSION=4.1.1
 set SLF4J_VERSION=2.0.9
 
 REM Download function
