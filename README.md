@@ -1,3 +1,5 @@
+<img width="801" height="597" alt="image" src="https://github.com/user-attachments/assets/5ee52f07-8ecf-44a4-b8b3-137e9bebbda0" />
+
 Kafka streams app written by me and then packaged into this executable and repo with Claude Opus 4.1
 
 # Kafka Streams Standalone Application
