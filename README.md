@@ -18,7 +18,7 @@ A self-contained Kafka Streams application that can be run with just Java instal
 
 ### Option 1: Use Pre-built JAR (Easiest)
 
-Just download `kafka-streams-app.jar` and run:
+Just download `kafka-streams-app.jar` from the [releases](https://github.com/charliegiang/kafka-streams-app-quickstart/releases/tag/v1.1.0) page and run:
 
 ```bash
 java -jar kafka-streams-app.jar
